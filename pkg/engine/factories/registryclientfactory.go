@@ -41,7 +41,7 @@ func (f *registryClientFactory) GetClient(ctx context.Context, creds *kyvernov1.
 		}
 
 		secrets := make([]string, 0)
-		if creds != nil && len(creds.Secrets) > 0 {
+		if creds != nil && f.secretsLister != nil && len(creds.Secrets) > 0 {
 			secrets = append(secrets, creds.Secrets...)
 		}
 		if len(imagePullSecrets) > 0 {
@@ -50,14 +50,11 @@ func (f *registryClientFactory) GetClient(ctx context.Context, creds *kyvernov1.
 				fallbackNamespace = config.KyvernoNamespace()
 			}
 			for _, s := range imagePullSecrets {
-				if strings.Contains(s, "/") {
-					secrets = append(secrets, s)
-				} else {
-					secrets = append(secrets, fallbackNamespace+"/"+s)
-				}
+				secretNamespace, secretName := registryclient.ParseSecretReference(s, fallbackNamespace)
+				secrets = append(secrets, secretNamespace+"/"+secretName)
 			}
 		}
-		if len(secrets) > 0 {
+		if f.secretsLister != nil && len(secrets) > 0 {
 			// Support namespace/name notation with Kyverno namespace as default
 			registryOptions = append(registryOptions, registryclient.WithKeychainPullSecrets(f.secretsLister, config.KyvernoNamespace(), secrets...))
 		}
